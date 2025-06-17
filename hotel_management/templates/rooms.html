@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Room Management{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Room Management</h2>
+    
+    <!-- Add Room Button -->
+    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+        Add New Room
+    </button>
+
+    <!-- Rooms Table -->
+    <div class="table-responsive">
+        <table class="table table-striped" id="roomsTable">
+            <thead>
+                <tr>
+                    <th>Room Number</th>
+                    <th>Type</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Rating</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Room data will be loaded here -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div class="modal fade" id="addRoomModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addRoomForm">
+                        <div class="mb-3">
+                            <label for="room_number" class="form-label">Room Number</label>
+                            <input type="text" class="form-control" id="room_number" name="room_number" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="room_type" class="form-label">Room Type</label>
+                            <select class="form-select" id="room_type" name="room_type" required>
+                                <option value="King">King</option>
+                                <option value="Queen">Queen</option>
+                                <option value="Royal">Royal</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Price</label>
+                            <input type="number" class="form-control" id="price" name="price" step="0.01" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Room</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Room Modal -->
+    <div class="modal fade" id="editRoomModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editRoomForm">
+                        <input type="hidden" id="edit_room_id" name="edit_room_id">
+                        <div class="mb-3">
+                            <label for="edit_room_number" class="form-label">Room Number</label>
+                            <input type="text" class="form-control" id="edit_room_number" name="edit_room_number" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_room_type" class="form-label">Room Type</label>
+                            <select class="form-select" id="edit_room_type" name="edit_room_type" required>
+                                <option value="King">King</option>
+                                <option value="Queen">Queen</option>
+                                <option value="Royal">Royal</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_price" class="form-label">Price</label>
+                            <input type="number" class="form-control" id="edit_price" name="edit_price" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_is_occupied" class="form-label">Status</label>
+                            <select class="form-select" id="edit_is_occupied" name="edit_is_occupied">
+                                <option value="false">Available</option>
+                                <option value="true">Occupied</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_rating" class="form-label">Rating</label>
+                            <input type="number" class="form-control" id="edit_rating" name="edit_rating" step="0.1" min="0" max="5" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Room</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/rooms.js' %}"></script>
+{% endblock %} 

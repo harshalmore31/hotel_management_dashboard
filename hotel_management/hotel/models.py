@@ -1,5 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from decimal import Decimal
+from django.utils import timezone
 
 class Room(models.Model):
     ROOM_TYPES = [
@@ -22,6 +24,9 @@ class Room(models.Model):
     def __str__(self):
         return f"Room {self.room_number} ({self.room_type})"
 
+    class Meta:
+        ordering = ['room_number']
+
 class Guest(models.Model):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
@@ -30,9 +35,12 @@ class Guest(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        ordering = ['name']
+
 class Booking(models.Model):
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='bookings')
-    guest = models.ForeignKey(Guest, on_delete=models.CASCADE, related_name='bookings')
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    guest = models.ForeignKey(Guest, on_delete=models.CASCADE)
     check_in_date = models.DateField()
     check_out_date = models.DateField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -41,5 +49,18 @@ class Booking(models.Model):
     def __str__(self):
         return f"Booking {self.id} - {self.guest.name} in Room {self.room.room_number}"
     
+    def save(self, *args, **kwargs):
+        # Update room occupancy when booking is created
+        if not self.pk:  # Only on creation
+            self.room.is_occupied = True
+            self.room.save()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Update room occupancy when booking is deleted
+        self.room.is_occupied = False
+        self.room.save()
+        super().delete(*args, **kwargs)
+
     class Meta:
-        ordering = ['-created_at'] 
+        ordering = ['-check_in_date'] 

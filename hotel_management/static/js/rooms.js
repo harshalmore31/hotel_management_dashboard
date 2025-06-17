@@ -18,6 +18,7 @@ const csrftoken = getCookie('csrftoken');
 
 // Load rooms when the page loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing rooms page...');
     loadRooms();
     
     // Add event listeners for forms
@@ -34,12 +35,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Function to load rooms
 async function loadRooms() {
+    console.log('Fetching rooms from API...');
     try {
         const response = await fetch('/api/rooms/');
+        console.log('API Response status:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const rooms = await response.json();
+        console.log('Received rooms data:', rooms);
         displayRooms(rooms);
     } catch (error) {
         console.error('Error loading rooms:', error);
@@ -49,6 +53,7 @@ async function loadRooms() {
 
 // Function to display rooms in the table
 function displayRooms(rooms) {
+    console.log('Displaying rooms in table...');
     const tbody = document.querySelector('#roomsTable tbody');
     if (!tbody) {
         console.error('Table body not found');
@@ -62,7 +67,9 @@ function displayRooms(rooms) {
         return;
     }
     
+    console.log(`Rendering ${rooms.length} rooms`);
     rooms.forEach(room => {
+        console.log('Rendering room:', room);
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${room.room_number || ''}</td>

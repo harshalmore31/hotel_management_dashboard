@@ -19,35 +19,48 @@ const csrftoken = getCookie('csrftoken');
 // Load guests when the page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing guests page...');
+    
+    // Check if api object is available
+    if (typeof api === 'undefined') {
+        console.error('API object not found. Make sure main.js is loaded before guests.js');
+        return;
+    }
+    
     loadGuests();
     
     // Add event listeners for forms
-    document.getElementById('addGuestForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        addGuest();
-    });
+    const addGuestForm = document.getElementById('addGuestForm');
+    const editGuestForm = document.getElementById('editGuestForm');
     
-    document.getElementById('editGuestForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        updateGuest();
-    });
+    if (addGuestForm) {
+        addGuestForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addGuest();
+        });
+    }
+    
+    if (editGuestForm) {
+        editGuestForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            updateGuest();
+        });
+    }
 });
 
 // Function to load guests
 async function loadGuests() {
     console.log('Fetching guests from API...');
     try {
-        const response = await fetch('/api/guests/');
-        console.log('API Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const guests = await response.json();
+        const guests = await api.get('/guests/');
         console.log('Received guests data:', guests);
         displayGuests(guests);
     } catch (error) {
         console.error('Error loading guests:', error);
-        alert('Failed to load guests. Please try again later.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to load guests. Please try again later.');
+        }
     }
 }
 
@@ -67,17 +80,38 @@ function displayGuests(guests) {
         return;
     }
     
+    if (guests.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center">
+                    <div class="empty-state">
+                        <i class="bi bi-people"></i>
+                        <h3>No guests found</h3>
+                        <p>Add your first guest to get started</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
     console.log(`Rendering ${guests.length} guests`);
     guests.forEach(guest => {
         console.log('Rendering guest:', guest);
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${guest.name || ''}</td>
+            <td><strong>${guest.name || ''}</strong></td>
             <td>${guest.email || ''}</td>
             <td>${guest.phone || ''}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editGuest(${guest.id})">Edit</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteGuest(${guest.id})">Delete</button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-primary" onclick="editGuest(${guest.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGuest(${guest.id})" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(row);
@@ -87,6 +121,11 @@ function displayGuests(guests) {
 // Function to add a new guest
 async function addGuest() {
     const form = document.getElementById('addGuestForm');
+    if (!form) {
+        console.error('Add guest form not found');
+        return;
+    }
+    
     const formData = new FormData(form);
     const guestData = {
         name: formData.get('name'),
@@ -94,31 +133,46 @@ async function addGuest() {
         phone: formData.get('phone')
     };
 
+    // Validate required fields
+    if (!guestData.name || !guestData.email || !guestData.phone) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestData.email)) {
+        alert('Please enter a valid email address.');
+        return;
+    }
+
     try {
         console.log('Adding new guest:', guestData);
-        const response = await fetch('/api/guests/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(guestData)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await api.post('/guests/', guestData);
+        console.log('Guest created successfully:', response);
 
         // Close modal and reset form
         const modal = bootstrap.Modal.getInstance(document.getElementById('addGuestModal'));
-        modal.hide();
+        if (modal) {
+            modal.hide();
+        }
         form.reset();
 
         // Reload guests
         loadGuests();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Guest added successfully!');
+        } else {
+            alert('Guest added successfully!');
+        }
     } catch (error) {
         console.error('Error adding guest:', error);
-        alert('Failed to add guest. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to add guest. Please try again.');
+        }
     }
 }
 
@@ -126,31 +180,41 @@ async function addGuest() {
 async function editGuest(guestId) {
     try {
         console.log('Fetching guest details for ID:', guestId);
-        const response = await fetch(`/api/guests/${guestId}/`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const guest = await response.json();
+        const guest = await api.get(`/guests/${guestId}/`);
         console.log('Received guest details:', guest);
 
         // Populate the edit form
-        document.getElementById('edit_guest_id').value = guest.id;
-        document.getElementById('edit_name').value = guest.name;
-        document.getElementById('edit_email').value = guest.email;
-        document.getElementById('edit_phone').value = guest.phone;
+        const editGuestId = document.getElementById('edit_guest_id');
+        const editName = document.getElementById('edit_name');
+        const editEmail = document.getElementById('edit_email');
+        const editPhone = document.getElementById('edit_phone');
+        
+        if (editGuestId) editGuestId.value = guest.id;
+        if (editName) editName.value = guest.name;
+        if (editEmail) editEmail.value = guest.email;
+        if (editPhone) editPhone.value = guest.phone;
 
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('editGuestModal'));
         modal.show();
     } catch (error) {
         console.error('Error loading guest details:', error);
-        alert('Failed to load guest details. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to load guest details. Please try again.');
+        }
     }
 }
 
 // Function to update a guest
 async function updateGuest() {
     const form = document.getElementById('editGuestForm');
+    if (!form) {
+        console.error('Edit guest form not found');
+        return;
+    }
+    
     const formData = new FormData(form);
     const guestId = formData.get('edit_guest_id');
     
@@ -160,31 +224,45 @@ async function updateGuest() {
         phone: formData.get('edit_phone')
     };
 
+    // Validate required fields
+    if (!guestData.name || !guestData.email || !guestData.phone) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestData.email)) {
+        alert('Please enter a valid email address.');
+        return;
+    }
+
     try {
-        console.log('Updating guest:', guestData);
-        const response = await fetch(`/api/guests/${guestId}/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(guestData)
-        });
+        console.log('Updating guest:', guestId, guestData);
+        const response = await api.put(`/guests/${guestId}/`, guestData);
+        console.log('Guest updated successfully:', response);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Close modal and reset form
+        // Close modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('editGuestModal'));
-        modal.hide();
-        form.reset();
+        if (modal) {
+            modal.hide();
+        }
 
         // Reload guests
         loadGuests();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Guest updated successfully!');
+        } else {
+            alert('Guest updated successfully!');
+        }
     } catch (error) {
         console.error('Error updating guest:', error);
-        alert('Failed to update guest. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to update guest. Please try again.');
+        }
     }
 }
 
@@ -196,21 +274,23 @@ async function deleteGuest(guestId) {
 
     try {
         console.log('Deleting guest with ID:', guestId);
-        const response = await fetch(`/api/guests/${guestId}/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': csrftoken
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        await api.delete(`/guests/${guestId}/`);
+        console.log('Guest deleted successfully');
 
         // Reload guests
         loadGuests();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Guest deleted successfully!');
+        } else {
+            alert('Guest deleted successfully!');
+        }
     } catch (error) {
         console.error('Error deleting guest:', error);
-        alert('Failed to delete guest. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to delete guest. Please try again.');
+        }
     }
 } 

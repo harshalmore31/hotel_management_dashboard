@@ -25,4 +25,5 @@ urlpatterns = [
     path('rooms/', TemplateView.as_view(template_name='rooms.html'), name='rooms'),
     path('guests/', TemplateView.as_view(template_name='guests.html'), name='guests'),
     path('bookings/', TemplateView.as_view(template_name='bookings.html'), name='bookings'),
+    path('test/', TemplateView.as_view(template_name='test_dashboard.html'), name='test'),
 ]

@@ -19,35 +19,48 @@ const csrftoken = getCookie('csrftoken');
 // Load rooms when the page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing rooms page...');
+    
+    // Check if api object is available
+    if (typeof api === 'undefined') {
+        console.error('API object not found. Make sure main.js is loaded before rooms.js');
+        return;
+    }
+    
     loadRooms();
     
     // Add event listeners for forms
-    document.getElementById('addRoomForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        addRoom();
-    });
+    const addRoomForm = document.getElementById('addRoomForm');
+    const editRoomForm = document.getElementById('editRoomForm');
     
-    document.getElementById('editRoomForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        updateRoom();
-    });
+    if (addRoomForm) {
+        addRoomForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addRoom();
+        });
+    }
+    
+    if (editRoomForm) {
+        editRoomForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            updateRoom();
+        });
+    }
 });
 
 // Function to load rooms
 async function loadRooms() {
     console.log('Fetching rooms from API...');
     try {
-        const response = await fetch('/api/rooms/');
-        console.log('API Response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const rooms = await response.json();
+        const rooms = await api.get('/rooms/');
         console.log('Received rooms data:', rooms);
         displayRooms(rooms);
     } catch (error) {
         console.error('Error loading rooms:', error);
-        alert('Failed to load rooms. Please try again later.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to load rooms. Please try again later.');
+        }
     }
 }
 
@@ -67,19 +80,51 @@ function displayRooms(rooms) {
         return;
     }
     
+    if (rooms.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="empty-state">
+                        <i class="bi bi-house"></i>
+                        <h3>No rooms found</h3>
+                        <p>Add your first room to get started</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
     console.log(`Rendering ${rooms.length} rooms`);
     rooms.forEach(room => {
         console.log('Rendering room:', room);
         const row = document.createElement('tr');
+        
+        // Format price
+        let price = room.price;
+        if (typeof utils !== 'undefined') {
+            price = utils.formatCurrency(room.price);
+        }
+        
+        // Status badge
+        const statusClass = room.is_occupied ? 'status-occupied' : 'status-available';
+        const statusText = room.is_occupied ? 'Occupied' : 'Available';
+        
         row.innerHTML = `
-            <td>${room.room_number || ''}</td>
+            <td><strong>${room.room_number || ''}</strong></td>
             <td>${room.room_type || ''}</td>
-            <td>$${room.price || '0.00'}</td>
-            <td>${room.is_occupied ? 'Occupied' : 'Available'}</td>
-            <td>${room.rating || '0.0'}</td>
+            <td><strong>${price}</strong></td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+            <td>${room.rating || '0.0'} ⭐</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editRoom(${room.id})">Edit</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteRoom(${room.id})">Delete</button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-primary" onclick="editRoom(${room.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteRoom(${room.id})" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(row);
@@ -89,6 +134,11 @@ function displayRooms(rooms) {
 // Function to add a new room
 async function addRoom() {
     const form = document.getElementById('addRoomForm');
+    if (!form) {
+        console.error('Add room form not found');
+        return;
+    }
+    
     const formData = new FormData(form);
     const roomData = {
         room_number: formData.get('room_number'),
@@ -98,62 +148,89 @@ async function addRoom() {
         rating: 0.0
     };
 
-    try {
-        const response = await fetch('/api/rooms/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(roomData)
-        });
+    // Validate required fields
+    if (!roomData.room_number || !roomData.room_type || !roomData.price) {
+        alert('Please fill in all required fields.');
+        return;
+    }
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    // Validate price
+    if (roomData.price <= 0) {
+        alert('Price must be greater than zero.');
+        return;
+    }
+
+    try {
+        console.log('Adding new room:', roomData);
+        const response = await api.post('/rooms/', roomData);
+        console.log('Room created successfully:', response);
 
         // Close modal and reset form
         const modal = bootstrap.Modal.getInstance(document.getElementById('addRoomModal'));
-        modal.hide();
+        if (modal) {
+            modal.hide();
+        }
         form.reset();
 
         // Reload rooms
         loadRooms();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Room added successfully!');
+        } else {
+            alert('Room added successfully!');
+        }
     } catch (error) {
         console.error('Error adding room:', error);
-        alert('Failed to add room. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to add room. Please try again.');
+        }
     }
 }
 
 // Function to edit a room
 async function editRoom(roomId) {
     try {
-        const response = await fetch(`/api/rooms/${roomId}/`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const room = await response.json();
+        const room = await api.get(`/rooms/${roomId}/`);
 
         // Populate the edit form
-        document.getElementById('edit_room_id').value = room.id;
-        document.getElementById('edit_room_number').value = room.room_number;
-        document.getElementById('edit_room_type').value = room.room_type;
-        document.getElementById('edit_price').value = room.price;
-        document.getElementById('edit_is_occupied').value = room.is_occupied;
-        document.getElementById('edit_rating').value = room.rating;
+        const editRoomId = document.getElementById('edit_room_id');
+        const editRoomNumber = document.getElementById('edit_room_number');
+        const editRoomType = document.getElementById('edit_room_type');
+        const editPrice = document.getElementById('edit_price');
+        const editIsOccupied = document.getElementById('edit_is_occupied');
+        const editRating = document.getElementById('edit_rating');
+        
+        if (editRoomId) editRoomId.value = room.id;
+        if (editRoomNumber) editRoomNumber.value = room.room_number;
+        if (editRoomType) editRoomType.value = room.room_type;
+        if (editPrice) editPrice.value = room.price;
+        if (editIsOccupied) editIsOccupied.value = room.is_occupied;
+        if (editRating) editRating.value = room.rating;
 
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('editRoomModal'));
         modal.show();
     } catch (error) {
         console.error('Error loading room details:', error);
-        alert('Failed to load room details. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to load room details. Please try again.');
+        }
     }
 }
 
 // Function to update a room
 async function updateRoom() {
     const form = document.getElementById('editRoomForm');
+    if (!form) {
+        console.error('Edit room form not found');
+        return;
+    }
+    
     const formData = new FormData(form);
     const roomId = formData.get('edit_room_id');
     
@@ -165,30 +242,50 @@ async function updateRoom() {
         rating: parseFloat(formData.get('edit_rating'))
     };
 
+    // Validate required fields
+    if (!roomData.room_number || !roomData.room_type || !roomData.price) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Validate price
+    if (roomData.price <= 0) {
+        alert('Price must be greater than zero.');
+        return;
+    }
+
+    // Validate rating
+    if (roomData.rating < 0 || roomData.rating > 5) {
+        alert('Rating must be between 0 and 5.');
+        return;
+    }
+
     try {
-        const response = await fetch(`/api/rooms/${roomId}/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(roomData)
-        });
+        console.log('Updating room:', roomId, roomData);
+        const response = await api.put(`/rooms/${roomId}/`, roomData);
+        console.log('Room updated successfully:', response);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Close modal and reset form
+        // Close modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('editRoomModal'));
-        modal.hide();
-        form.reset();
+        if (modal) {
+            modal.hide();
+        }
 
         // Reload rooms
         loadRooms();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Room updated successfully!');
+        } else {
+            alert('Room updated successfully!');
+        }
     } catch (error) {
         console.error('Error updating room:', error);
-        alert('Failed to update room. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to update room. Please try again.');
+        }
     }
 }
 
@@ -199,21 +296,24 @@ async function deleteRoom(roomId) {
     }
 
     try {
-        const response = await fetch(`/api/rooms/${roomId}/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': csrftoken
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        console.log('Deleting room with ID:', roomId);
+        await api.delete(`/rooms/${roomId}/`);
+        console.log('Room deleted successfully');
 
         // Reload rooms
         loadRooms();
+        
+        if (typeof utils !== 'undefined') {
+            utils.showNotification('Room deleted successfully!');
+        } else {
+            alert('Room deleted successfully!');
+        }
     } catch (error) {
         console.error('Error deleting room:', error);
-        alert('Failed to delete room. Please try again.');
+        if (typeof utils !== 'undefined') {
+            utils.handleError(error);
+        } else {
+            alert('Failed to delete room. Please try again.');
+        }
     }
 } 

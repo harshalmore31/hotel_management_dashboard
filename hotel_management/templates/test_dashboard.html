@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Test</title>
+</head>
+<body>
+    <h1>Dashboard Test</h1>
+    <div id="test-results"></div>
+    
+    <script src="/static/js/main.js"></script>
+    <script>
+        async function testDashboard() {
+            const resultsDiv = document.getElementById('test-results');
+            
+            try {
+                console.log('Testing dashboard API...');
+                const response = await fetch('/api/dashboard/stats/');
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Dashboard data:', data);
+                    
+                    resultsDiv.innerHTML = `
+                        <h2>API Test Results:</h2>
+                        <p><strong>Status:</strong> ${response.status} OK</p>
+                        <p><strong>Total Rooms:</strong> ${data.total_rooms}</p>
+                        <p><strong>Occupied Rooms:</strong> ${data.occupied_rooms}</p>
+                        <p><strong>Occupancy Rate:</strong> ${data.occupancy_rate}%</p>
+                        <p><strong>Average Price:</strong> $${data.avg_price}</p>
+                        <p><strong>Today's Bookings:</strong> ${data.todays_bookings}</p>
+                        <p><strong>Recent Bookings:</strong> ${data.recent_bookings.length}</p>
+                        <h3>Recent Bookings:</h3>
+                        <ul>
+                            ${data.recent_bookings.map(booking => 
+                                `<li>Booking ${booking.id}: ${booking.guest.name} in Room ${booking.room.room_number}</li>`
+                            ).join('')}
+                        </ul>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<p>Error: ${response.status}</p>`;
+                }
+            } catch (error) {
+                console.error('Test error:', error);
+                resultsDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', testDashboard);
+    </script>
+</body>
+</html> 

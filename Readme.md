@@ -2,6 +2,16 @@
 
 A web-based hotel management application built with Django framework. This project manages hotel operations including room bookings, guest registration, and room administration.
 
+
+## Student Information
+
+**Name**: Harshal More, 23108A0054
+
+**Project**: Hotel Management System
+
+**Technology Stack**: Python, Django, HTML, CSS, JavaScript
+
+
 ## Technologies Used
 
 - **Backend**: Python 3.12, Django 5.0.1, Django REST Framework
@@ -100,8 +110,3 @@ All CRUD operations have been tested:
 - API endpoint functionality
 - Responsive design on different screens
 
-## Student Information
-
-**Name**: Harshal More, 23108A0054
-**Project**: Hotel Management System
-**Technology Stack**: Python, Django, HTML, CSS, JavaScript 
